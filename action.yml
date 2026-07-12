@@ -5,14 +5,15 @@ inputs:
     description: 'Comma separated paths of the generated jacoco xml files (supports wildcard glob pattern)'
     required: true
   token:
-    description: 'Github personal token to add comments to Pull Request'
-    required: true
+    description: Github token to add comments to Pull Request (defaults to automatic token, make sure job permissions allow it to write to pull_requests)
+    required: false
+    default: ${{ github.token }}
   min-coverage-overall:
     description: 'The minimum code coverage that is required to pass for overall project'
     required: false
     default: '80'
-  min-coverage-changed-files:
-    description: 'The minimum code coverage that is required to pass for changed files'
+  min-coverage-changed-lines:
+    description: 'The minimum code coverage that is required to pass for changed lines'
     required: false
     default: '80'
   title:
@@ -49,19 +50,37 @@ inputs:
     description: 'When there is an error do not fail the action, but log a warning'
     required: false
     default: 'true'
+  coverage-counter-type:
+    description: 'The type of JaCoCo counter to use for coverage calculation (INSTRUCTION, BRANCH, LINE, COMPLEXITY, METHOD). Note: COMPLEXITY and METHOD are not available at per-line granularity, so changed-lines coverage will fall back to INSTRUCTION for those types.'
+    required: false
+    default: 'INSTRUCTION'
+  show-all-modules:
+    description: 'If true, show coverage for all modules in the comment, not just those with changed files'
+    required: false
+    default: 'false'
+  show-missing-lines:
+    description: 'If true, show the line numbers of uncovered code in the Files table with hyperlinks'
+    required: false
+    default: 'true'
   debug-mode:
     description: 'Run the action in debug mode and get debug logs printed in console'
     required: false
     default: 'false'
+  head-sha:
+    description: 'The head SHA to use for comparing changes. Useful when the head SHA is not available in the context (e.g. PRs from forks via workflow_run).'
+    required: false
+  base-sha:
+    description: 'The base SHA to use for comparing changes. Useful when the base SHA is not available in the context (e.g. PRs from forks via workflow_run).'
+    required: false
 
 outputs:
   coverage-overall:
     description: 'The overall coverage of the project'
-  coverage-changed-files:
-    description: 'The total coverage of all changed files'
+  coverage-changed-lines:
+    description: 'The coverage of lines that were changed in the PR'
 
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
 
 branding:

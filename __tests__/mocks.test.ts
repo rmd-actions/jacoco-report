@@ -1,3 +1,5 @@
+import {it} from '@jest/globals'
+
 export const PATCH = {
   SINGLE_MODULE: {
     COVERAGE:
@@ -227,7 +229,6 @@ export const PROJECT = {
       },
     ],
     isMultiModule: false,
-    'coverage-changed-files': 35.25,
     overall: {
       covered: 43,
       missed: 79,
@@ -429,7 +430,6 @@ export const PROJECT = {
       },
     ],
     isMultiModule: true,
-    'coverage-changed-files': 21.98,
     overall: {
       covered: 40,
       missed: 156,

@@ -14,29 +14,39 @@ An [example workflow](#example-workflow) is available below. For more informatio
 Documentation
 for [Creating a workflow file](https://help.github.com/en/articles/configuring-a-workflow#creating-a-workflow-file).
 
+Note: When using `comment-type: pr_comment` or `comment-type: both` (the default is `pr_comment`), the following permissions are required:
+
+- `pull-requests: write` (or `issues: write`)
+- `contents: read`
+
 ### Inputs
 
 - `paths` - [**required**] Comma separated paths of the generated jacoco xml files (supports wildcard glob pattern)
-- `token` - [**required**] Github personal token to add comments to Pull Request
+- `token` - [*optional* {default: `github.token`}] Github token to add comments to Pull Request (ensure the job has `pull-requests: write` permission)
 - `min-coverage-overall` - [*optional* {default: 80%}] The minimum code coverage that is required to pass for overall project
-- `min-coverage-changed-files` - [*optional* {default: 80%}] The minimum code coverage that is required to pass for changed files
+- `min-coverage-changed-lines` - [*optional* {default: 80%}] The minimum code coverage that is required to pass for changed lines
 - `update-comment` - [*optional* {default: false}] If true, updates the previous coverage report comment instead of creating new one.
   Requires `title` to work properly
 - `comment-type` - [*optional* {pr_comment, summary, both} {default: pr_comment}] Specifies where to add the comment, whether as a PR comment,
   workflow summary, or both.
 - `pr-number` - [*optional*] The PR number to add the comment to. If not provided, the action will try to get it from the environment.
 - `title` - [*optional*] Title for the Pull Request comment
+- `head-sha` - [*optional*] The head SHA to use for comparing changes. Useful when the head SHA is not available in the context (e.g. PRs from forks via `workflow_run`).
+- `base-sha` - [*optional*] The base SHA to use for comparing changes. Useful when the base SHA is not available in the context (e.g. PRs from forks via `workflow_run`).
 - `skip-if-no-changes` - [*optional* {default: false}] If true, comment won't be added if there is no coverage information present for
   the files changed
 - `pass-emoji` - [*optional* {default: :green_apple:}] Emoji to use for pass status shown when 'coverage >= min coverage' (should be a Github supported emoji).
 - `fail-emoji` - [*optional* {default: :x:}] Emoji to use for fail status shown when 'coverage < min coverage' (should be a Github supported emoji).
+- `coverage-counter-type` - [*optional* {INSTRUCTION, BRANCH, LINE, COMPLEXITY, METHOD} {default: INSTRUCTION}] The type of JaCoCo counter to use for coverage calculation. Note: COMPLEXITY and METHOD are not available at per-line granularity, so changed-lines coverage will fall back to INSTRUCTION for those types.
+- `show-all-modules` - [*optional* {default: false}] If true, show coverage for all modules in the comment, not just those with changed files
+- `show-missing-lines` - [*optional* {default: true}] If true, show the line numbers of uncovered code in the Files table with hyperlinks to the exact lines in the source
 - `continue-on-error` - [*optional* {default: true}] If true, then do not fail the action on error, but log a warning
 - `debug-mode` - [*optional* {default: false}] If true, run the action in debug mode and get debug logs printed in console
 
 ### Outputs
 
 - `coverage-overall` - The overall coverage of the project
-- `coverage-changed-files` - The total coverage of all changed files
+- `coverage-changed-lines` - The coverage of lines that were changed in the PR
 
 ### Example Workflow
 
@@ -52,11 +62,12 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up JDK 1.8
-        uses: actions/setup-java@v1
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          java-version: 1.8
+          distribution: temurin
+          java-version: 17
       - name: Run Coverage
         run: |
           chmod +x gradlew
@@ -64,14 +75,14 @@ jobs:
 
       - name: Add coverage to PR
         id: jacoco
-        uses: madrapps/jacoco-report@v1.7.2
+        uses: madrapps/jacoco-report@v1.8.0
         with:
           paths: |
             ${{ github.workspace }}/**/build/reports/jacoco/prodNormalDebugCoverage/prodNormalDebugCoverage.xml,
             ${{ github.workspace }}/**/build/reports/jacoco/**/debugCoverage.xml
           token: ${{ secrets.GITHUB_TOKEN }}
           min-coverage-overall: 40
-          min-coverage-changed-files: 60
+          min-coverage-changed-lines: 60
 ```
 
 <br>
@@ -124,12 +135,12 @@ refer [jacoco-android-playground](https://github.com/thsaravana/jacoco-android-p
    ```yaml
    - name: Jacoco Report to PR
      id: jacoco
-     uses: madrapps/jacoco-report@v1.7.2
+     uses: madrapps/jacoco-report@v1.8.0
      with:
        paths: ${{ github.workspace }}/build/reports/jacoco/testCoverage/testCoverage.xml
        token: ${{ secrets.GITHUB_TOKEN }}
        min-coverage-overall: 40
-       min-coverage-changed-files: 60
+       min-coverage-changed-lines: 60
        title: Code Coverage
        update-comment: true
    ```
@@ -145,14 +156,14 @@ refer [jacoco-android-playground](https://github.com/thsaravana/jacoco-android-p
    ```yaml
    - name: Jacoco Report to PR
      id: jacoco
-     uses: madrapps/jacoco-report@v1.7.2
+     uses: madrapps/jacoco-report@v1.8.0
      with:
        paths: |
          ${{ github.workspace }}/**/build/reports/jacoco/**/prodNormalDebugCoverage.xml,
          ${{ github.workspace }}/**/build/reports/jacoco/**/debugCoverage.xml
        token: ${{ secrets.GITHUB_TOKEN }}
        min-coverage-overall: 40
-       min-coverage-changed-files: 60
+       min-coverage-changed-lines: 60
    ```
 
 4. When you need to customize the pass/fail emojis or the style of title in the comment
@@ -165,16 +176,21 @@ refer [jacoco-android-playground](https://github.com/thsaravana/jacoco-android-p
    ```yaml
    - name: Jacoco Report to PR
      id: jacoco
-     uses: madrapps/jacoco-report@v1.7.2
+     uses: madrapps/jacoco-report@v1.8.0
      with:
        paths: ${{ github.workspace }}/build/reports/jacoco/testCoverage/testCoverage.xml
        token: ${{ secrets.GITHUB_TOKEN }}
        min-coverage-overall: 40
-       min-coverage-changed-files: 60
+       min-coverage-changed-lines: 60
        title: '# :lobster: Coverage Report'
        pass-emoji: ':green_circle:'
        fail-emoji: ':red_circle:'
    ```
+
+## Breaking Changes (v2.0)
+
+- `min-coverage-changed-files` input has been **renamed** to `min-coverage-changed-lines`. The threshold now clearly reflects what it checks — the coverage of lines that were changed in the PR.
+- `coverage-changed-files` output has been **removed**. Use `coverage-changed-lines` instead, which provides the coverage of the actual changed lines (not the overall coverage of files containing changes).
 
 ## Troubleshooting
 

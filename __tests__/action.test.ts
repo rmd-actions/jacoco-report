@@ -1,11 +1,16 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
-import * as action from '../src/action'
-import * as core from '@actions/core'
-import * as github from '@actions/github'
+import {jest, describe, it, expect, beforeEach} from '@jest/globals'
+import {createMockCore, createMockContext, createMockGithub} from './helpers'
 
-jest.mock('@actions/core')
-jest.mock('@actions/github')
+const mockCore = createMockCore()
+const mockContext = createMockContext()
+const mockGithub = createMockGithub(mockContext)
+
+jest.unstable_mockModule('@actions/core', () => mockCore)
+jest.unstable_mockModule('@actions/github', () => mockGithub)
+
+const action = await import('../src/action')
 
 describe('Input validation', function () {
   const eventName = 'pull_request'
@@ -27,6 +32,8 @@ describe('Input validation', function () {
         return './__tests__/__fixtures__/report.xml'
       case 'token':
         return 'SMPLEHDjasdf876a987'
+      case 'coverage-counter-type':
+        return 'INSTRUCTION'
     }
   }
 
@@ -34,9 +41,9 @@ describe('Input validation', function () {
   const listComments = jest.fn()
   const updateComment = jest.fn()
 
-  core.getInput = jest.fn(getInput)
-  github.getOctokit = jest.fn(() => {
-    return {
+  beforeEach(() => {
+    mockCore.getInput.mockImplementation(getInput)
+    mockGithub.getOctokit.mockReturnValue({
       rest: {
         repos: {
           compareCommits: jest.fn(() => {
@@ -65,14 +72,14 @@ describe('Input validation', function () {
           updateComment,
         },
       },
-    }
-  })
-  core.setFailed = jest.fn(c => {
-    fail(c)
+    })
+    mockCore.setFailed.mockImplementation(c => {
+      fail(c)
+    })
   })
 
   it('Fail if paths is not present', async () => {
-    core.getInput = jest.fn(c => {
+    mockCore.getInput.mockImplementation(c => {
       switch (c) {
         case 'paths':
           return ''
@@ -80,16 +87,16 @@ describe('Input validation', function () {
           return getInput(c)
       }
     })
-    github.context.eventName = 'pull_request'
+    mockContext.eventName = 'pull_request'
 
-    core.setFailed = jest.fn(c => {
+    mockCore.setFailed.mockImplementation(c => {
       expect(c).toEqual("'paths' is missing")
     })
     await action.action()
   })
 
   it('Fail if token is not present', async () => {
-    core.getInput = jest.fn(c => {
+    mockCore.getInput.mockImplementation(c => {
       switch (c) {
         case 'token':
           return ''
@@ -97,15 +104,15 @@ describe('Input validation', function () {
           return getInput(c)
       }
     })
-    github.context.eventName = 'pull_request'
-    core.setFailed = jest.fn(c => {
+    mockContext.eventName = 'pull_request'
+    mockCore.setFailed.mockImplementation(c => {
       expect(c).toEqual("'token' is missing")
     })
     await action.action()
   })
 
   it('Fail if comment-type is invalid', async () => {
-    core.getInput = jest.fn(c => {
+    mockCore.getInput.mockImplementation(c => {
       switch (c) {
         case 'comment-type':
           return 'invalid'
@@ -113,8 +120,46 @@ describe('Input validation', function () {
           return getInput(c)
       }
     })
-    core.setFailed = jest.fn(c => {
+    mockCore.setFailed.mockImplementation(c => {
       expect(c).toEqual("'comment-type' invalid is invalid")
+    })
+    initContext(eventName, payload)
+
+    await action.action()
+  })
+
+  it('Fail if coverage-counter-type is invalid', async () => {
+    mockCore.getInput.mockImplementation(c => {
+      switch (c) {
+        case 'coverage-counter-type':
+          return 'INVALID'
+        default:
+          return getInput(c)
+      }
+    })
+    mockCore.setFailed.mockImplementation(c => {
+      expect(c).toEqual(
+        "'coverage-counter-type' INVALID is invalid. Valid values: INSTRUCTION, BRANCH, LINE, COMPLEXITY, METHOD"
+      )
+    })
+    initContext(eventName, payload)
+
+    await action.action()
+  })
+
+  it('coverage-counter-type is uppercased before validation', async () => {
+    mockCore.getInput.mockImplementation(c => {
+      switch (c) {
+        case 'coverage-counter-type':
+          return 'invalid_lower'
+        default:
+          return getInput(c)
+      }
+    })
+    mockCore.setFailed.mockImplementation(c => {
+      expect(c).toEqual(
+        "'coverage-counter-type' INVALID_LOWER is invalid. Valid values: INSTRUCTION, BRANCH, LINE, COMPLEXITY, METHOD"
+      )
     })
     initContext(eventName, payload)
 
@@ -123,9 +168,7 @@ describe('Input validation', function () {
 })
 
 function initContext(eventName, payload): void {
-  const context = github.context
-  context.eventName = eventName
-  context.payload = payload
-  context.repo = 'jacoco-playground'
-  context.owner = 'madrapps'
+  mockContext.eventName = eventName
+  mockContext.payload = payload
+  mockContext.repo = {owner: 'madrapps', repo: 'jacoco-playground'}
 }
