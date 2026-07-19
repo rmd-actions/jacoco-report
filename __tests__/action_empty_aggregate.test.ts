@@ -1,12 +1,17 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
-import * as action from '../src/action'
-import * as core from '@actions/core'
-import * as github from '@actions/github'
+import {jest, describe, it, expect, beforeEach} from '@jest/globals'
+import {createMockCore, createMockContext, createMockGithub} from './helpers'
 import {PATCH} from './mocks.test'
 
-jest.mock('@actions/core')
-jest.mock('@actions/github')
+const mockCore = createMockCore()
+const mockContext = createMockContext()
+const mockGithub = createMockGithub(mockContext)
+
+jest.unstable_mockModule('@actions/core', () => mockCore)
+jest.unstable_mockModule('@actions/github', () => mockGithub)
+
+const action = await import('../src/action')
 
 describe('Aggregate Empty report', function () {
   let createComment
@@ -24,12 +29,14 @@ describe('Aggregate Empty report', function () {
         return 'pr_comment'
       case 'min-coverage-overall':
         return 45
-      case 'min-coverage-changed-files':
+      case 'min-coverage-changed-lines':
         return 90
       case 'pass-emoji':
         return ':green_apple:'
       case 'fail-emoji':
         return ':x:'
+      case 'coverage-counter-type':
+        return 'INSTRUCTION'
       case 'debug-mode':
         return 'true'
     }
@@ -41,27 +48,26 @@ describe('Aggregate Empty report', function () {
     updateComment = jest.fn()
     output = jest.fn()
 
-    core.getInput = jest.fn(getInput)
-    github.getOctokit = jest.fn(() => {
-      return {
-        rest: {
-          repos: {
-            compareCommits: jest.fn(() => {
-              return compareCommitsResponse
-            }),
-            listPullRequestsAssociatedWithCommit: jest.fn(() => {
-              return {data: []}
-            }),
-          },
-          issues: {
-            createComment,
-            listComments,
-            updateComment,
-          },
+    mockCore.getInput.mockImplementation(getInput)
+    mockCore.setOutput.mockImplementation((...args) => output(...args))
+    mockGithub.getOctokit.mockReturnValue({
+      rest: {
+        repos: {
+          compareCommits: jest.fn(() => {
+            return compareCommitsResponse
+          }),
+          listPullRequestsAssociatedWithCommit: jest.fn(() => {
+            return {data: []}
+          }),
         },
-      }
+        issues: {
+          createComment,
+          listComments,
+          updateComment,
+        },
+      },
     })
-    core.setFailed = jest.fn(c => {
+    mockCore.setFailed.mockImplementation(c => {
       fail(c)
     })
   })
@@ -125,7 +131,7 @@ describe('Aggregate Empty report', function () {
     it('updates a previous comment', async () => {
       initContext(eventName, payload)
       const title = 'JaCoCo Report'
-      core.getInput = jest.fn(c => {
+      mockCore.getInput.mockImplementation(c => {
         switch (c) {
           case 'title':
             return title
@@ -151,7 +157,6 @@ describe('Aggregate Empty report', function () {
 
     it('set overall coverage output', async () => {
       initContext(eventName, payload)
-      core.setOutput = output
 
       await action.action()
 
@@ -159,22 +164,19 @@ describe('Aggregate Empty report', function () {
       expect(out).toEqual(['coverage-overall', 76.32])
     })
 
-    it('set changed files coverage output', async () => {
+    it('set changed lines coverage output', async () => {
       initContext(eventName, payload)
-      core.setOutput = output
 
       await action.action()
 
       const out = output.mock.calls[1]
-      expect(out).toEqual(['coverage-changed-files', 58.82])
+      expect(out).toEqual(['coverage-changed-lines', 100])
     })
   })
 })
 
 function initContext(eventName, payload): void {
-  const context = github.context
-  context.eventName = eventName
-  context.payload = payload
-  context.repo = 'jacoco-playground'
-  context.owner = 'madrapps'
+  mockContext.eventName = eventName
+  mockContext.payload = payload
+  mockContext.repo = {owner: 'madrapps', repo: 'jacoco-playground'}
 }

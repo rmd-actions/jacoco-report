@@ -1,10 +1,8 @@
+import {describe, it, expect} from '@jest/globals'
 import * as util from '../src/util'
 import * as fs from 'fs'
 import {Report} from '../src/models/jacoco-types'
 import {parseToReport} from '../src/util'
-
-jest.mock('@actions/core')
-jest.mock('@actions/github')
 
 describe('Util', function () {
   describe('getChangedLines', function () {
@@ -236,6 +234,20 @@ describe('Util', function () {
           packageName: 'com/madrapps/jacoco/operation',
         },
       ])
+    })
+  })
+
+  describe('parseToReport', function () {
+    it('throws error for invalid XML without report tag', async () => {
+      await expect(parseToReport('<invalid>data</invalid>')).rejects.toThrow(
+        'Invalid report'
+      )
+    })
+
+    it('throws error for empty XML object', async () => {
+      await expect(parseToReport('<root></root>')).rejects.toThrow(
+        'Invalid report'
+      )
     })
   })
 })
