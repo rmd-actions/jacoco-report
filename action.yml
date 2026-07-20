@@ -5,8 +5,9 @@ inputs:
     description: 'Comma separated paths of the generated jacoco xml files (supports wildcard glob pattern)'
     required: true
   token:
-    description: 'Github personal token to add comments to Pull Request'
-    required: true
+    description: Github token to add comments to Pull Request (defaults to automatic token, make sure job permissions allow it to write to pull_requests)
+    required: false
+    default: ${{ github.token }}
   min-coverage-overall:
     description: 'The minimum code coverage that is required to pass for overall project'
     required: false
@@ -53,6 +54,12 @@ inputs:
     description: 'Run the action in debug mode and get debug logs printed in console'
     required: false
     default: 'false'
+  head-sha:
+    description: 'The head SHA to use for comparing changes. Useful when the head SHA is not available in the context (e.g. PRs from forks via workflow_run).'
+    required: false
+  base-sha:
+    description: 'The base SHA to use for comparing changes. Useful when the base SHA is not available in the context (e.g. PRs from forks via workflow_run).'
+    required: false
 
 outputs:
   coverage-overall:
@@ -61,7 +68,7 @@ outputs:
     description: 'The total coverage of all changed files'
 
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
 
 branding:

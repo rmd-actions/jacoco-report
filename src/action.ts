@@ -4,12 +4,12 @@ import * as github from '@actions/github'
 import * as fs from 'fs'
 import {parseBooleans} from 'xml2js/lib/processors'
 import * as glob from '@actions/glob'
-import {getProjectCoverage} from './process'
-import {getPRComment, getTitle} from './render'
-import {debug, getChangedLines, parseToReport} from './util'
-import {Project} from './models/project'
-import {ChangedFile} from './models/github'
-import {Report} from './models/jacoco-types'
+import {getProjectCoverage} from './process.js'
+import {getPRComment, getTitle} from './render.js'
+import {debug, getChangedLines, parseToReport} from './util.js'
+import {Project} from './models/project.js'
+import {ChangedFile} from './models/github.js'
+import {Report} from './models/jacoco-types.js'
 import {GitHub} from '@actions/github/lib/utils'
 
 export async function action(): Promise<void> {
@@ -105,6 +105,17 @@ export async function action(): Promise<void> {
           `The event ${github.context.eventName} is not supported.`
         )
         return
+    }
+
+    const headShaInput = core.getInput('head-sha')
+    const baseShaInput = core.getInput('base-sha')
+    switch (event) {
+      case 'pull_request':
+      case 'pull_request_target':
+      case 'workflow_run':
+        if (headShaInput) head = headShaInput
+        if (baseShaInput) base = baseShaInput
+        break
     }
 
     core.info(`base sha: ${base}`)

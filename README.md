@@ -14,10 +14,15 @@ An [example workflow](#example-workflow) is available below. For more informatio
 Documentation
 for [Creating a workflow file](https://help.github.com/en/articles/configuring-a-workflow#creating-a-workflow-file).
 
+Note: When using `comment-type: pr_comment` or `comment-type: both` (the default is `pr_comment`), the following permissions are required:
+
+- `pull-requests: write` (or `issues: write`)
+- `contents: read`
+
 ### Inputs
 
 - `paths` - [**required**] Comma separated paths of the generated jacoco xml files (supports wildcard glob pattern)
-- `token` - [**required**] Github personal token to add comments to Pull Request
+- `token` - [*optional* {default: `github.token`}] Github token to add comments to Pull Request (ensure the job has `pull-requests: write` permission)
 - `min-coverage-overall` - [*optional* {default: 80%}] The minimum code coverage that is required to pass for overall project
 - `min-coverage-changed-files` - [*optional* {default: 80%}] The minimum code coverage that is required to pass for changed files
 - `update-comment` - [*optional* {default: false}] If true, updates the previous coverage report comment instead of creating new one.
@@ -26,6 +31,8 @@ for [Creating a workflow file](https://help.github.com/en/articles/configuring-a
   workflow summary, or both.
 - `pr-number` - [*optional*] The PR number to add the comment to. If not provided, the action will try to get it from the environment.
 - `title` - [*optional*] Title for the Pull Request comment
+- `head-sha` - [*optional*] The head SHA to use for comparing changes. Useful when the head SHA is not available in the context (e.g. PRs from forks via `workflow_run`).
+- `base-sha` - [*optional*] The base SHA to use for comparing changes. Useful when the base SHA is not available in the context (e.g. PRs from forks via `workflow_run`).
 - `skip-if-no-changes` - [*optional* {default: false}] If true, comment won't be added if there is no coverage information present for
   the files changed
 - `pass-emoji` - [*optional* {default: :green_apple:}] Emoji to use for pass status shown when 'coverage >= min coverage' (should be a Github supported emoji).
@@ -52,11 +59,12 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up JDK 1.8
-        uses: actions/setup-java@v1
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          java-version: 1.8
+          distribution: temurin
+          java-version: 17
       - name: Run Coverage
         run: |
           chmod +x gradlew
@@ -64,7 +72,7 @@ jobs:
 
       - name: Add coverage to PR
         id: jacoco
-        uses: madrapps/jacoco-report@v1.7.2
+        uses: madrapps/jacoco-report@v1.8.0
         with:
           paths: |
             ${{ github.workspace }}/**/build/reports/jacoco/prodNormalDebugCoverage/prodNormalDebugCoverage.xml,
@@ -124,7 +132,7 @@ refer [jacoco-android-playground](https://github.com/thsaravana/jacoco-android-p
    ```yaml
    - name: Jacoco Report to PR
      id: jacoco
-     uses: madrapps/jacoco-report@v1.7.2
+     uses: madrapps/jacoco-report@v1.8.0
      with:
        paths: ${{ github.workspace }}/build/reports/jacoco/testCoverage/testCoverage.xml
        token: ${{ secrets.GITHUB_TOKEN }}
@@ -145,7 +153,7 @@ refer [jacoco-android-playground](https://github.com/thsaravana/jacoco-android-p
    ```yaml
    - name: Jacoco Report to PR
      id: jacoco
-     uses: madrapps/jacoco-report@v1.7.2
+     uses: madrapps/jacoco-report@v1.8.0
      with:
        paths: |
          ${{ github.workspace }}/**/build/reports/jacoco/**/prodNormalDebugCoverage.xml,
@@ -165,7 +173,7 @@ refer [jacoco-android-playground](https://github.com/thsaravana/jacoco-android-p
    ```yaml
    - name: Jacoco Report to PR
      id: jacoco
-     uses: madrapps/jacoco-report@v1.7.2
+     uses: madrapps/jacoco-report@v1.8.0
      with:
        paths: ${{ github.workspace }}/build/reports/jacoco/testCoverage/testCoverage.xml
        token: ${{ secrets.GITHUB_TOKEN }}
