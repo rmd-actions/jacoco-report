@@ -9,7 +9,11 @@ import {getPRComment, getTitle} from './render.js'
 import {debug, getChangedLines, parseToReport} from './util.js'
 import {Project} from './models/project.js'
 import {ChangedFile} from './models/github.js'
-import {Report} from './models/jacoco-types.js'
+import {
+  CoverageCounterType,
+  Report,
+  VALID_COVERAGE_COUNTER_TYPES,
+} from './models/jacoco-types.js'
 import {GitHub} from '@actions/github/lib/utils'
 
 export async function action(): Promise<void> {
@@ -27,9 +31,15 @@ export async function action(): Promise<void> {
     }
 
     const reportPaths = pathsString.split(',')
+    if (core.getInput('min-coverage-changed-files')) {
+      core.setFailed(
+        "'min-coverage-changed-files' is no longer supported. Please use 'min-coverage-changed-lines' instead."
+      )
+      return
+    }
     const minCoverageOverall = parseFloat(core.getInput('min-coverage-overall'))
-    const minCoverageChangedFiles = parseFloat(
-      core.getInput('min-coverage-changed-files')
+    const minCoverageChangedLines = parseFloat(
+      core.getInput('min-coverage-changed-lines')
     )
     const title = core.getInput('title')
     const updateComment = parseBooleans(core.getInput('update-comment'))
@@ -41,11 +51,22 @@ export async function action(): Promise<void> {
       }
     }
     const skipIfNoChanges = parseBooleans(core.getInput('skip-if-no-changes'))
+    const showAllModules = parseBooleans(core.getInput('show-all-modules'))
+    const showMissingLines = parseBooleans(core.getInput('show-missing-lines'))
     const passEmoji = core.getInput('pass-emoji')
     const failEmoji = core.getInput('fail-emoji')
 
     continueOnError = parseBooleans(core.getInput('continue-on-error'))
     const debugMode = parseBooleans(core.getInput('debug-mode'))
+    const coverageCounterType = core
+      .getInput('coverage-counter-type')
+      .toUpperCase() as CoverageCounterType
+    if (!VALID_COVERAGE_COUNTER_TYPES.includes(coverageCounterType)) {
+      core.setFailed(
+        `'coverage-counter-type' ${coverageCounterType} is invalid. Valid values: ${VALID_COVERAGE_COUNTER_TYPES.join(', ')}`
+      )
+      return
+    }
 
     const event = github.context.eventName
     core.info(`Event is ${event}`)
@@ -62,8 +83,12 @@ export async function action(): Promise<void> {
       core.setFailed(`'comment-type' ${commentType} is invalid`)
     }
 
+    const prNumberInput = core.getInput('pr-number')
+    const parsedPrNumber = parseInt(prNumberInput, 10)
     let prNumber: number | undefined =
-      Number(core.getInput('pr-number')) || undefined
+      Number.isInteger(parsedPrNumber) && parsedPrNumber > 0
+        ? parsedPrNumber
+        : undefined
 
     const client = github.getOctokit(token)
 
@@ -113,8 +138,30 @@ export async function action(): Promise<void> {
       case 'pull_request':
       case 'pull_request_target':
       case 'workflow_run':
-        if (headShaInput) head = headShaInput
-        if (baseShaInput) base = baseShaInput
+        if (headShaInput || baseShaInput) {
+          if (headShaInput) head = headShaInput
+          if (baseShaInput) base = baseShaInput
+        } else if (prNumberInput && prNumber) {
+          const pr = await client.rest.pulls.get({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            pull_number: prNumber,
+          })
+          base = pr.data.base.sha
+          head = pr.data.head.sha
+        }
+        break
+      case 'workflow_dispatch':
+      case 'schedule':
+        if (prNumberInput && prNumber) {
+          const pr = await client.rest.pulls.get({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            pull_number: prNumber,
+          })
+          base = pr.data.base.sha
+          head = pr.data.head.sha
+        }
         break
     }
 
@@ -129,15 +176,20 @@ export async function action(): Promise<void> {
     const reportsJsonAsync = getJsonReports(reportPaths, debugMode)
     const reports = await reportsJsonAsync
 
-    const project: Project = getProjectCoverage(reports, changedFiles)
+    const project: Project = getProjectCoverage(
+      reports,
+      changedFiles,
+      coverageCounterType,
+      showAllModules
+    )
     if (debugMode) core.info(`project: ${debug(project)}`)
     core.setOutput(
       'coverage-overall',
       project.overall ? parseFloat(project.overall.percentage.toFixed(2)) : 100
     )
     core.setOutput(
-      'coverage-changed-files',
-      parseFloat(project['coverage-changed-files'].toFixed(2))
+      'coverage-changed-lines',
+      project.changed ? parseFloat(project.changed.percentage.toFixed(2)) : 100
     )
 
     const skip = skipIfNoChanges && project.modules.length === 0
@@ -153,10 +205,12 @@ export async function action(): Promise<void> {
         project,
         {
           overall: minCoverageOverall,
-          changed: minCoverageChangedFiles,
+          changed: minCoverageChangedLines,
         },
         title,
-        emoji
+        emoji,
+        showMissingLines,
+        coverageCounterType
       )
       switch (commentType) {
         case 'pr_comment':
@@ -205,9 +259,12 @@ async function getJsonReports(
   if (debugMode) core.info(`Resolved files: ${files}`)
 
   return Promise.all(
-    files.map(async path => {
-      const reportXml = await fs.promises.readFile(path.trim(), 'utf-8')
-      return await parseToReport(reportXml)
+    files.map(async filePath => {
+      const trimmedPath = filePath.trim()
+      const reportXml = await fs.promises.readFile(trimmedPath, 'utf-8')
+      const report = await parseToReport(reportXml)
+      report.filePath = trimmedPath
+      return report
     })
   )
 }
