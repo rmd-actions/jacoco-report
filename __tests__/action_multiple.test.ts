@@ -66,12 +66,14 @@ describe('Multiple reports', function () {
         return 'pr_comment'
       case 'min-coverage-overall':
         return 45
-      case 'min-coverage-changed-files':
+      case 'min-coverage-changed-lines':
         return 90
       case 'pass-emoji':
         return ':green_apple:'
       case 'fail-emoji':
         return ':x:'
+      case 'coverage-counter-type':
+        return 'INSTRUCTION'
       case 'debug-mode':
         return 'false'
     }
@@ -124,7 +126,7 @@ describe('Multiple reports', function () {
       expect(comment.mock.calls[0][0].body)
         .toEqual(`|Overall Project|20.41% **\`-16.84%\`**|:x:|
 |:-|:-|:-:|
-|Files changed|8.33%|:x:|
+|Changed lines|8.33%|:x:|
 <br>
 
 |Module|Coverage||
@@ -156,13 +158,13 @@ describe('Multiple reports', function () {
       expect(out).toEqual(['coverage-overall', 20.41])
     })
 
-    it('set changed files coverage output', async () => {
+    it('set changed lines coverage output', async () => {
       initContext(eventName, payload)
 
       await action.action()
 
       const out = output.mock.calls[1]
-      expect(out).toEqual(['coverage-changed-files', 22.6])
+      expect(out).toEqual(['coverage-changed-lines', 8.33])
     })
   })
 
@@ -181,13 +183,13 @@ describe('Multiple reports', function () {
       expect(out).toEqual(['coverage-overall', 20.41])
     })
 
-    it('set changed files coverage output', async () => {
+    it('set changed lines coverage output', async () => {
       initContext('push', payload)
 
       await action.action()
 
       const out = output.mock.calls[1]
-      expect(out).toEqual(['coverage-changed-files', 22.6])
+      expect(out).toEqual(['coverage-changed-lines', 8.33])
     })
   })
 })

@@ -1,5 +1,6 @@
 export interface Report {
   name: string
+  filePath?: string
   sessioninfo?: SessionInfo[]
   group?: Group[]
   package?: Package[]
@@ -59,3 +60,18 @@ export interface Counter {
   missed: number
   covered: number
 }
+
+export type CoverageCounterType =
+  | 'INSTRUCTION'
+  | 'BRANCH'
+  | 'LINE'
+  | 'COMPLEXITY'
+  | 'METHOD'
+
+export const VALID_COVERAGE_COUNTER_TYPES: CoverageCounterType[] = [
+  'INSTRUCTION',
+  'BRANCH',
+  'LINE',
+  'COMPLEXITY',
+  'METHOD',
+]
